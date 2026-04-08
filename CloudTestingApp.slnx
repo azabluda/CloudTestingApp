@@ -1,9 +1,11 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/CloudTestingApp.Api/CloudTestingApp.Api.csproj" />
+    <Project Path="src/CloudTestingApp.AppHost/CloudTestingApp.AppHost.csproj" />
     <Project Path="src/CloudTestingApp.Application/CloudTestingApp.Application.csproj" />
     <Project Path="src/CloudTestingApp.Blazor/CloudTestingApp.Blazor.csproj" />
     <Project Path="src/CloudTestingApp.Domain/CloudTestingApp.Domain.csproj" />
     <Project Path="src/CloudTestingApp.Infrastructure/CloudTestingApp.Infrastructure.csproj" />
+    <Project Path="src/CloudTestingApp.ServiceDefaults/CloudTestingApp.ServiceDefaults.csproj" />
   </Folder>
 </Solution>

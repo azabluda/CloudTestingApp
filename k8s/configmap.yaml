@@ -3,7 +3,7 @@ kind: ConfigMap
 metadata:
   name: cloudtestingapp-config
 data:
-  ConnectionStrings__DefaultConnection: "Host=postgres-db;Database=cloudtestingapp;Username=postgres;Password=postgres"
+  ConnectionStrings__cloudtestingapp: "Host=postgres-db;Database=cloudtestingapp;Username=postgres;Password=postgres"
 ---
 apiVersion: v1
 kind: Secret

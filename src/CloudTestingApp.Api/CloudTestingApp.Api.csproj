@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.2.1" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.5" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.5" />
   </ItemGroup>
@@ -15,6 +16,7 @@
     <ProjectReference Include="..\CloudTestingApp.Application\CloudTestingApp.Application.csproj" />
     <ProjectReference Include="..\CloudTestingApp.Infrastructure\CloudTestingApp.Infrastructure.csproj" />
     <ProjectReference Include="..\CloudTestingApp.Blazor\CloudTestingApp.Blazor.csproj" />
+    <ProjectReference Include="..\CloudTestingApp.ServiceDefaults\CloudTestingApp.ServiceDefaults.csproj" />
   </ItemGroup>
 
 </Project>

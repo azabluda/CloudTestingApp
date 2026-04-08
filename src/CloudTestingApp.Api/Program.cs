@@ -3,17 +3,19 @@ using CloudTestingApp.Application.Services;
 using CloudTestingApp.Domain.Entities;
 using CloudTestingApp.Domain.Interfaces;
 using CloudTestingApp.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
+using CloudTestingApp.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Aspire service defaults (OpenTelemetry, health checks, resilience)
+builder.AddServiceDefaults();
 
 // Add services to the container.
 builder.Services.AddOpenApi();
 
-// Database
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(connectionString));
+// Database — Aspire injects the connection string automatically when running
+// under the AppHost. For standalone/K8s the fallback reads appsettings.json.
+builder.AddNpgsqlDbContext<ApplicationDbContext>("cloudtestingapp");
 
 // DI
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
@@ -42,6 +44,8 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+
+app.MapDefaultEndpoints();
 
 app.UseCors("AllowBlazor");
 
