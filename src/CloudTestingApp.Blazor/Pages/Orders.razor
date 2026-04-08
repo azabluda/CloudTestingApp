@@ -1,0 +1,74 @@
+@page "/orders"
+@using CloudTestingApp.Application.DTOs
+@using CloudTestingApp.Domain.Entities
+@inject HttpClient Http
+
+<h3>Orders</h3>
+
+@if (orders == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Customer</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Created</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var order in orders)
+            {
+                <tr>
+                    <td>@order.Id</td>
+                    <td>@order.CustomerName</td>
+                    <td>@order.TotalAmount:C</td>
+                    <td>@order.Status</td>
+                    <td>@order.CreatedAt.ToString("g")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<hr />
+<h4>Create New Order</h4>
+<div class="form-group">
+    <label>Customer Name:</label>
+    <input @bind="newOrder.CustomerName" class="form-control" />
+</div>
+<div class="form-group">
+    <label>Total Amount:</label>
+    <input @bind="newOrder.TotalAmount" type="number" class="form-control" />
+</div>
+<button @onclick="CreateOrder" class="btn btn-primary mt-2">Create Order</button>
+
+@code {
+    private IEnumerable<OrderDto>? orders;
+    private CreateOrderRequest newOrder = new("", 0);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrders();
+    }
+
+    private async Task LoadOrders()
+    {
+        orders = await Http.GetFromJsonAsync<IEnumerable<OrderDto>>("api/orders");
+    }
+
+    private async Task CreateOrder()
+    {
+        var response = await Http.PostAsJsonAsync("api/orders", newOrder);
+        if (response.IsSuccessStatusCode)
+        {
+            newOrder = new("", 0);
+            await LoadOrders();
+        }
+    }
+}

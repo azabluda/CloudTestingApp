@@ -1,8 +1,32 @@
+using CloudTestingApp.Application.DTOs;
+using CloudTestingApp.Application.Services;
+using CloudTestingApp.Domain.Entities;
+using CloudTestingApp.Domain.Interfaces;
+using CloudTestingApp.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+// Database
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseNpgsql(connectionString));
+
+// DI
+builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+builder.Services.AddScoped<IOrderService, OrderService>();
+
+// CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowBlazor", policy =>
+    {
+        policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+    });
+});
 
 var app = builder.Build();
 
@@ -12,30 +36,39 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+app.UseCors("AllowBlazor");
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+// Endpoints
+var orders = app.MapGroup("/api/orders");
 
-app.MapGet("/weatherforecast", () =>
+orders.MapGet("/", async (IOrderService orderService, CancellationToken ct) =>
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+    var result = await orderService.GetAllOrdersAsync(ct);
+    return result.IsSuccess ? Results.Ok(result.Value) : Results.BadRequest(result.Error);
+});
+
+orders.MapGet("/{id:guid}", async (Guid id, IOrderService orderService, CancellationToken ct) =>
+{
+    var result = await orderService.GetOrderByIdAsync(id, ct);
+    return result.IsSuccess ? Results.Ok(result.Value) : Results.NotFound(result.Error);
+});
+
+orders.MapPost("/", async (CreateOrderRequest request, IOrderService orderService, CancellationToken ct) =>
+{
+    var result = await orderService.CreateOrderAsync(request, ct);
+    return result.IsSuccess ? Results.Created($"/api/orders/{result.Value!.Id}", result.Value) : Results.BadRequest(result.Error);
+});
+
+orders.MapPut("/{id:guid}/status", async (Guid id, OrderStatus status, IOrderService orderService, CancellationToken ct) =>
+{
+    var result = await orderService.UpdateOrderStatusAsync(id, status, ct);
+    return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+});
+
+orders.MapDelete("/{id:guid}", async (Guid id, IOrderService orderService, CancellationToken ct) =>
+{
+    var result = await orderService.DeleteOrderAsync(id, ct);
+    return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+});
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
