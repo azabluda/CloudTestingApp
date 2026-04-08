@@ -5,11 +5,16 @@
 
 <h3>Orders</h3>
 
-@if (orders == null)
+@if (errorMessage != null)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@if (orders == null && errorMessage == null)
 {
     <p><em>Loading...</em></p>
 }
-else
+else if (orders != null)
 {
     <table class="table">
         <thead>
@@ -25,9 +30,9 @@ else
             @foreach (var order in orders)
             {
                 <tr>
-                    <td>@order.Id</td>
+                    <td>@order.Id.ToString().Substring(0, 8)...</td>
                     <td>@order.CustomerName</td>
-                    <td>@order.TotalAmount:C</td>
+                    <td>@order.TotalAmount.ToString("C")</td>
                     <td>@order.Status</td>
                     <td>@order.CreatedAt.ToString("g")</td>
                 </tr>
@@ -51,6 +56,7 @@ else
 @code {
     private IEnumerable<OrderDto>? orders;
     private CreateOrderRequest newOrder = new("", 0);
+    private string? errorMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -59,16 +65,36 @@ else
 
     private async Task LoadOrders()
     {
-        orders = await Http.GetFromJsonAsync<IEnumerable<OrderDto>>("api/orders");
+        try
+        {
+            errorMessage = null;
+            orders = await Http.GetFromJsonAsync<IEnumerable<OrderDto>>("api/orders");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading orders: {ex.Message}";
+        }
     }
 
     private async Task CreateOrder()
     {
-        var response = await Http.PostAsJsonAsync("api/orders", newOrder);
-        if (response.IsSuccessStatusCode)
+        try
         {
-            newOrder = new("", 0);
-            await LoadOrders();
+            errorMessage = null;
+            var response = await Http.PostAsJsonAsync("api/orders", newOrder);
+            if (response.IsSuccessStatusCode)
+            {
+                newOrder = new("", 0);
+                await LoadOrders();
+            }
+            else
+            {
+                errorMessage = $"Error creating order: {response.ReasonPhrase}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error creating order: {ex.Message}";
         }
     }
 }

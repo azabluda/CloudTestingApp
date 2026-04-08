@@ -30,6 +30,13 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Migrate Database
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    await context.Database.EnsureCreatedAsync();
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -37,6 +44,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowBlazor");
+
+app.MapStaticAssets();
 
 // Endpoints
 var orders = app.MapGroup("/api/orders");
@@ -70,5 +79,7 @@ orders.MapDelete("/{id:guid}", async (Guid id, IOrderService orderService, Cance
     var result = await orderService.DeleteOrderAsync(id, ct);
     return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
 });
+
+app.MapFallbackToFile("index.html");
 
 app.Run();

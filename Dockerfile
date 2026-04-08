@@ -9,8 +9,7 @@ RUN dotnet restore src/CloudTestingApp.Api/CloudTestingApp.Api.csproj
 
 # Copy everything else and build
 COPY src/ ./src/
-RUN dotnet publish src/CloudTestingApp.Blazor/CloudTestingApp.Blazor.csproj -c Release -o /app/blazor
-RUN dotnet publish src/CloudTestingApp.Api/CloudTestingApp.Api.csproj -c Release -o /app/api
+RUN dotnet publish src/CloudTestingApp.Api/CloudTestingApp.Api.csproj -c Release -o /app/publish
 
 # Stage 2: Final image
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
@@ -18,12 +17,10 @@ WORKDIR /app
 EXPOSE 8080
 EXPOSE 8081
 
-# Copy build artifacts
-COPY --from=build /app/api .
-# Copy Blazor artifacts to Api's wwwroot
-COPY --from=build /app/blazor/wwwroot ./wwwroot
+# Copy build artifacts (SDK handles Blazor integration automatically)
+COPY --from=build /app/publish .
 
-# Rootless podman compatibility
+# Run as non-root user
 USER $APP_UID
 
 ENTRYPOINT ["dotnet", "CloudTestingApp.Api.dll"]

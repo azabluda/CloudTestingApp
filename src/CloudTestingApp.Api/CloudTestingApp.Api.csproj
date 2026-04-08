@@ -7,12 +7,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.5" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.5" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\CloudTestingApp.Application\CloudTestingApp.Application.csproj" />
     <ProjectReference Include="..\CloudTestingApp.Infrastructure\CloudTestingApp.Infrastructure.csproj" />
+    <ProjectReference Include="..\CloudTestingApp.Blazor\CloudTestingApp.Blazor.csproj" />
   </ItemGroup>
 
 </Project>

@@ -9,6 +9,15 @@ public record OrderDto(
     DateTimeOffset CreatedAt,
     OrderStatus Status);
 
-public record CreateOrderRequest(
-    string CustomerName,
-    decimal TotalAmount);
+public class CreateOrderRequest
+{
+    public string CustomerName { get; set; } = string.Empty;
+    public decimal TotalAmount { get; set; }
+
+    public CreateOrderRequest() { }
+    public CreateOrderRequest(string customerName, decimal totalAmount)
+    {
+        CustomerName = customerName;
+        TotalAmount = totalAmount;
+    }
+}

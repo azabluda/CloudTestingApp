@@ -1,7 +1,4 @@
 using CloudTestingApp.Application.DTOs;
-using CloudTestingApp.Domain.Common;
-using CloudTestingApp.Domain.Entities;
-using CloudTestingApp.Domain.Interfaces;
 
 namespace CloudTestingApp.Application.Services;
 
