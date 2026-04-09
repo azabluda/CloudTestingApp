@@ -1,0 +1,19 @@
+# Strategic-merge patches for Postgres in local K8s.
+# Fix imagePullPolicy (public image shouldn't be Never) and add resource limits.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+spec:
+  template:
+    spec:
+      containers:
+      - name: postgres
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"

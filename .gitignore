@@ -46,6 +46,11 @@ bld/
 # Docker
 app.tar
 
+# Aspirate — generated base manifests (regenerated from AppHost via `dev.ps1 generate`)
+k8s/base/
+src/CloudTestingApp.AppHost/manifest.json
+src/CloudTestingApp.AppHost/aspirate-state.json
+
 # OS files
 Thumbs.db
 ehthumbs.db

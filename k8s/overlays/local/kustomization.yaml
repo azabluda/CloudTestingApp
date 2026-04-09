@@ -1,0 +1,15 @@
+namespace: default
+
+resources:
+- ../../base
+
+images:
+# Aspirate generates "docker.io/library/api:latest" from the AppHost project name.
+# Override to match the image we build with our Dockerfile.
+- name: docker.io/library/api
+  newName: cloudtestingapp
+  newTag: latest
+
+patches:
+- path: api-patches.yaml
+- path: postgres-patches.yaml

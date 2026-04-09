@@ -2,21 +2,24 @@
 .SYNOPSIS
     Build and deploy CloudTestingApp to local Kubernetes.
 .DESCRIPTION
-    Auto-detects your container runtime (Docker or Podman) and K8s cluster type
-    (Docker Desktop K8s or Kind), then builds the image, loads it, and deploys.
+    Generates K8s manifests from the Aspire AppHost (single source of truth),
+    auto-detects your container runtime (Docker or Podman) and K8s cluster type
+    (Docker Desktop K8s or Kind), then builds the image, loads it, and deploys
+    using Kustomize overlays.
 .PARAMETER Action
-    What to do: build, deploy, all (default), status, teardown, forward, infra
+    What to do: build, deploy, all (default), generate, status, teardown, forward, infra
 .EXAMPLE
-    .\dev.ps1              # Build + Deploy + Port-forward
+    .\dev.ps1              # Generate manifests + Build + Deploy + Port-forward
+    .\dev.ps1 generate     # Regenerate K8s base manifests from Aspire AppHost
     .\dev.ps1 infra        # Deploy Postgres only + port-forward it (for F5 debugging)
-    .\dev.ps1 build        # Build image only
-    .\dev.ps1 deploy       # Apply K8s manifests only
+    .\dev.ps1 build        # Build container image only
+    .\dev.ps1 deploy       # Generate + Build + load image + apply K8s manifests
     .\dev.ps1 forward      # Port-forward only
     .\dev.ps1 status       # Show pod/service status
     .\dev.ps1 teardown     # Remove everything from K8s
 #>
 param(
-    [ValidateSet("build", "deploy", "all", "status", "teardown", "forward", "infra")]
+    [ValidateSet("build", "deploy", "all", "generate", "status", "teardown", "forward", "infra")]
     [string]$Action = "all"
 )
 
@@ -25,6 +28,8 @@ $ImageName = "cloudtestingapp"
 $ImageTag = "latest"
 $FullImage = "${ImageName}:${ImageTag}"
 $Namespace = "default"
+$AppHostPath = "src/CloudTestingApp.AppHost"
+$Overlay = "k8s/overlays/local"
 
 # --- Detect container runtime ---
 function Get-ContainerRuntime {
@@ -65,6 +70,46 @@ function Get-ClusterType {
 }
 
 function Write-Step($msg) { Write-Host "`n>> $msg" -ForegroundColor Cyan }
+
+# --- Generate K8s manifests from Aspire AppHost ---
+function Invoke-Generate {
+    Write-Step "Generating K8s manifests from Aspire AppHost..."
+    Push-Location $AppHostPath
+    try {
+        dotnet aspirate generate `
+            --non-interactive `
+            --skip-build `
+            --disable-secrets `
+            --include-dashboard `
+            --output-format kustomize `
+            --output-path "../../k8s/base" `
+            --image-pull-policy Never `
+            --namespace default
+        if ($LASTEXITCODE -ne 0) { throw "aspirate generate failed." }
+    }
+    finally {
+        Pop-Location
+    }
+
+    # Post-generation cleanup: remove artifacts that aspirate forces but we don't need.
+    # 1) namespace.yaml — the 'default' namespace already exists; deleting it on teardown is forbidden.
+    # 2) dashboard.yaml — aspirate requires --include-dashboard in non-interactive mode,
+    #    but we don't need the Aspire dashboard in K8s (it's for local Aspire F5 only).
+    $basePath = "k8s/base"
+    foreach ($unwanted in @("namespace.yaml", "dashboard.yaml")) {
+        $file = Join-Path $basePath $unwanted
+        if (Test-Path $file) { Remove-Item $file }
+    }
+    # Strip removed files from the root kustomization.yaml
+    $kustFile = Join-Path $basePath "kustomization.yaml"
+    if (Test-Path $kustFile) {
+        $content = Get-Content $kustFile |
+            Where-Object { $_ -notmatch "^\s*-\s*(namespace|dashboard)\.yaml\s*$" }
+        $content | Set-Content $kustFile
+    }
+
+    Write-Host "Manifests generated in k8s/base/" -ForegroundColor Green
+}
 
 # --- Build ---
 function Invoke-Build {
@@ -117,13 +162,13 @@ function Invoke-LoadImage {
 
 # --- Deploy ---
 function Invoke-Deploy {
-    Write-Step "Applying K8s manifests..."
-    kubectl apply -f k8s/
+    Write-Step "Applying Kustomize overlay ($Overlay)..."
+    kubectl apply -k $Overlay
     if ($LASTEXITCODE -ne 0) { throw "kubectl apply failed." }
 
     Write-Host "`nWaiting for pods to be ready..." -ForegroundColor Yellow
-    kubectl rollout status deployment/cloudtestingapp --timeout=90s 2>$null
-    kubectl rollout status deployment/postgres-db --timeout=90s 2>$null
+    kubectl rollout status deployment/api --timeout=90s 2>$null
+    kubectl rollout status deployment/postgres --timeout=90s 2>$null
     Write-Host "Deployment ready." -ForegroundColor Green
 }
 
@@ -131,7 +176,7 @@ function Invoke-Deploy {
 function Invoke-Forward {
     Write-Step "Port-forwarding to http://localhost:8080 ..."
     Write-Host "Press Ctrl+C to stop.`n" -ForegroundColor Yellow
-    kubectl port-forward service/cloudtestingapp 8080:80
+    kubectl port-forward service/api 8080:8080
 }
 
 # --- Status ---
@@ -143,39 +188,40 @@ function Invoke-Status {
     Write-Host "  Cluster : $cluster"
     Write-Host "  Context : $(kubectl config current-context 2>$null)"
     Write-Host ""
-    kubectl get pods,svc -l "app in (cloudtestingapp, postgres-db)" -o wide
+    kubectl get pods,svc -l "app in (api, postgres)" -o wide
 }
 
 # --- Infrastructure only (Postgres in K8s, port-forwarded for local F5 debugging) ---
 function Invoke-Infra {
+    Invoke-Generate
     Write-Step "Deploying infrastructure (Postgres) to K8s..."
-    kubectl apply -f k8s/postgres-dev.yaml
-    kubectl apply -f k8s/configmap.yaml
+    kubectl apply -k k8s/base/postgres
     if ($LASTEXITCODE -ne 0) { throw "kubectl apply failed." }
 
     Write-Host "Waiting for Postgres to be ready..." -ForegroundColor Yellow
-    kubectl rollout status deployment/postgres-db --timeout=90s 2>$null
+    kubectl rollout status deployment/postgres --timeout=90s 2>$null
     Write-Host "Postgres ready." -ForegroundColor Green
 
     Write-Step "Port-forwarding Postgres to localhost:5432 ..."
     Write-Host "Postgres available at localhost:5432" -ForegroundColor Green
     Write-Host "Now open the solution in Visual Studio and press F5 (use 'k8s-debug' profile)." -ForegroundColor Yellow
     Write-Host "Press Ctrl+C to stop.`n" -ForegroundColor Yellow
-    kubectl port-forward service/postgres-db 5432:5432
+    kubectl port-forward service/postgres 5432:5432
 }
 
 # --- Teardown ---
 function Invoke-Teardown {
     Write-Step "Removing K8s resources..."
-    kubectl delete -f k8s/ --ignore-not-found
+    kubectl delete -k $Overlay --ignore-not-found
     Write-Host "Teardown complete." -ForegroundColor Green
 }
 
 # --- Main ---
 switch ($Action) {
+    "generate" { Invoke-Generate }
     "build"    { Invoke-Build }
-    "deploy"   { Invoke-Build; Invoke-LoadImage; Invoke-Deploy }
-    "all"      { Invoke-Build; Invoke-LoadImage; Invoke-Deploy; Invoke-Forward }
+    "deploy"   { Invoke-Generate; Invoke-Build; Invoke-LoadImage; Invoke-Deploy }
+    "all"      { Invoke-Generate; Invoke-Build; Invoke-LoadImage; Invoke-Deploy; Invoke-Forward }
     "infra"    { Invoke-Infra }
     "forward"  { Invoke-Forward }
     "status"   { Invoke-Status }
